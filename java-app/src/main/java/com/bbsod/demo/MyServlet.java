@@ -1,6 +1,7 @@
 package com.bbsod.demo;
 
 import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -61,6 +62,7 @@ import io.opentelemetry.api.baggage.Baggage;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
 
+@WebServlet(urlPatterns = "/MyWebApp", loadOnStartup = -1)
 public class MyServlet extends HttpServlet {
 
     // Define Class Fields
@@ -83,24 +85,8 @@ public class MyServlet extends HttpServlet {
     // private final Tracer tracer;
 
     // Constructor
-    public MyServlet() {
-        // Display "getting data..." message 
-        System.out.println("Getting data...");
-        
-        // Start a new span for the sleep
-        Span span = tracer.spanBuilder("SleepForTwoSeconds")
-                .setSpanKind(SpanKind.INTERNAL)
-                .startSpan();
-
-        try (Scope scope = span.makeCurrent()) {
-        // try{
-            // Sleep for 2 seconds
-            Thread.sleep(2000);
-            span.end(); // Ensure the span ends after the sleep
-        } catch (InterruptedException e) {
-            span.recordException(e);
-            e.printStackTrace();
-        }        
+    public MyServlet() {                
+                
         // Initializes OpenTelemetry and calls parameterized constructor with this new instance of OpenTelemetry
         // // this(initOpenTelemetry());
     }    
@@ -174,16 +160,35 @@ public class MyServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+
+        List<JSONObject> dataList = new ArrayList<>();
+        PrintWriter out = response.getWriter();
         response.setContentType("text/html");
+
+        // Start a new span for the sleep
+        Span delaySpan = tracer.spanBuilder("SleepForTwoSeconds")
+                .setSpanKind(SpanKind.INTERNAL)
+                .startSpan();
+
+        try (Scope scope = delaySpan.makeCurrent()) {
+        // try{
+            // Sleep for 2 seconds
+            Thread.sleep(2000);
+            delaySpan.end(); // Ensure the span ends after the sleep
+        } catch (InterruptedException e) {
+            delaySpan.recordException(e);
+            e.printStackTrace();
+        }
 
         // Increment metric counter
         requestCounter.add(1);
 
         // Start a span
-        Span span = tracer.spanBuilder("initiate database query").startSpan();
+        Context parentContext = Context.current().with(delaySpan);
+        Span dbSpan = tracer.spanBuilder("Database transaction").setParent(parentContext).startSpan();
 
         // Establish database connection and get data
-        try (Scope scope = span.makeCurrent(); PrintWriter out = response.getWriter()) {
+        try (Scope scope = dbSpan.makeCurrent()) {
             // JDBC connection parameters
             // String jdbcUrl = "jdbc:mysql://localhost:3306/mydatabase";
             String jdbcUrl = "jdbc:mysql://mysql_container:3306/mydatabase";
@@ -210,7 +215,7 @@ public class MyServlet extends HttpServlet {
                 out.println("<table border='1'>");
                 out.println("<tr><th>ID</th><th>Name</th><th>Age</th></tr>");
 
-                List<JSONObject> dataList = new ArrayList<>();
+                
                 while (resultSet.next()) {
                     int id = resultSet.getInt("id");
                     String name = resultSet.getString("name");
@@ -225,13 +230,7 @@ public class MyServlet extends HttpServlet {
                     dataList.add(dataObject);
 
                 }
-
                 out.println("</table>");
-
-                // Make a request to the Python microservice
-                String averageAge = getAverageAge(dataList);
-                out.println("<h2>Average Age: " + averageAge + "</h2>");
-                out.println("</body></html>");
 
             } catch (ClassNotFoundException e) {
                 System.out.println("MySQL JDBC Driver not found.");
@@ -243,11 +242,16 @@ public class MyServlet extends HttpServlet {
                 e.printStackTrace();
                 out.println("<h2>Error: " + e.getMessage() + "</h2>");
             } finally {
-                span.end(); // Close the span once request complete
+                dbSpan.end(); // Close the span once request complete
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+        
+        // Make a request to the Python microservice
+        String averageAge = getAverageAge(dataList);
+        out.println("<h2>Average Age: " + averageAge + "</h2>");
+        out.println("</body></html>");
 
     }
 
