@@ -47,33 +47,7 @@
             <artifactId>json</artifactId>
             <version>20240303</version>
         </dependency>
-
-        <!-- OpenTelemetry -->
-        <dependency>
-            <groupId>io.opentelemetry</groupId>
-            <artifactId>opentelemetry-api</artifactId>
-            <version>1.42.0</version>
-        </dependency>
-        <dependency>
-            <groupId>io.opentelemetry</groupId>
-            <artifactId>opentelemetry-sdk</artifactId>
-            <version>1.42.0</version>
-        </dependency>
-        <dependency>
-            <groupId>io.opentelemetry</groupId>
-            <artifactId>opentelemetry-exporter-otlp</artifactId>
-            <version>1.42.0</version>
-        </dependency>
-        <dependency>
-            <groupId>io.opentelemetry</groupId>
-            <artifactId>opentelemetry-exporter-logging</artifactId>
-            <version>1.42.0</version>
-        </dependency>
     </dependencies>
-
-    <!-- <build>
-        <finalName>MyWebApp</finalName>
-    </build> -->
 
     <build>
         <plugins>
