@@ -16,9 +16,8 @@ services:
       - my_network
 
   tomcat:
-    container_name: tomcat
     build:
-      context: ./tomcat      
+      context: ./tomcat
     ports:
       - "8085:8080"
       - "9010:9010"
@@ -59,7 +58,6 @@ services:
       - my_network
 
   jaeger:
-    container_name: jaeger
     image: jaegertracing/all-in-one:latest
     ports:
       - "6831:6831/udp"
