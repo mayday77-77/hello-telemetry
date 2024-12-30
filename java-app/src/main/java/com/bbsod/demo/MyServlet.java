@@ -30,13 +30,19 @@ import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.metrics.SdkMeterProvider;
 import io.opentelemetry.sdk.metrics.export.PeriodicMetricReader;
 import io.opentelemetry.sdk.resources.Resource;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 // OpenTelemetry API
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.metrics.LongCounter;
 import io.opentelemetry.api.metrics.Meter;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporter;
+import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
 
 public class MyServlet extends HttpServlet {
 
@@ -44,6 +50,7 @@ public class MyServlet extends HttpServlet {
     private static final String INSTRUMENTATION_NAME = MyServlet.class.getName();
     private final Meter meter;
     private final LongCounter requestCounter;
+    private final Tracer tracer;
 
     // Constructor
     public MyServlet() {
@@ -52,6 +59,7 @@ public class MyServlet extends HttpServlet {
         this.requestCounter = meter.counterBuilder("app.db.db_requests")
                 .setDescription("Count DB requests")
                 .build();
+        this.tracer = openTelemetry.getTracer(INSTRUMENTATION_NAME);
     }
 
     static OpenTelemetry initOpenTelemetry() {
@@ -74,8 +82,23 @@ public class MyServlet extends HttpServlet {
                 .registerMetricReader(periodicMetricReader)
                 .build();
 
+        // Traces
+        OtlpGrpcSpanExporter otlpGrpcSpanExporter = OtlpGrpcSpanExporter.builder()
+                .setEndpoint("http://otel-collector:4317")
+                .build();
+
+        SimpleSpanProcessor simpleSpanProcessor = SimpleSpanProcessor.builder(otlpGrpcSpanExporter).build();
+        
+        
+        SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
+                .setResource(resource)
+                .addSpanProcessor(simpleSpanProcessor)
+                .build();        
+
+
         OpenTelemetrySdk sdk = OpenTelemetrySdk.builder()
                 .setMeterProvider(sdkMeterProvider)
+                .setTracerProvider(tracerProvider)
                 .build();
 
         // Cleanup
@@ -94,14 +117,27 @@ public class MyServlet extends HttpServlet {
         response.setContentType("text/html");
 
         // Sleep for 2 seconds
+        // Span to capture sleep
+
+        Span sleepSpan = tracer.spanBuilder("SleepForTwoSeconds")
+                .setSpanKind(SpanKind.INTERNAL)
+                .startSpan();
         try {
             Thread.sleep(2000);
         } catch (InterruptedException e) {
             e.printStackTrace();
+        } finally{
+            sleepSpan.end();
         }
 
+        
         // Establish database connection and get data
         requestCounter.add(1);
+
+        // Start Database Span
+        Span dbSpan = tracer.spanBuilder("DatabaseConnection")
+            .setSpanKind(SpanKind.INTERNAL)
+            .startSpan();
 
         // JDBC connection parameters
         String jdbcUrl = "jdbc:mysql://mysql_container:3306/mydatabase";
@@ -153,6 +189,8 @@ public class MyServlet extends HttpServlet {
         } catch (Exception e) {
             e.printStackTrace();
             out.println("<h2>Error: " + e.getMessage() + "</h2>");
+        } finally{
+            dbSpan.end();
         }
 
         // Make a request to the Python microservice
