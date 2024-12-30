@@ -64,7 +64,7 @@ public class MyServlet extends HttpServlet {
 
     // Constructor
     public MyServlet() {
-        OpenTelemetry openTelemetry = initOpenTelemetry();
+        OpenTelemetry openTelemetry = GlobalOpenTelemetry.get();
         this.meter = openTelemetry.getMeter(INSTRUMENTATION_NAME);
         this.requestCounter = meter.counterBuilder("app.db.db_requests")
                 .setDescription("Count DB requests")
@@ -79,65 +79,65 @@ public class MyServlet extends HttpServlet {
         SLF4JBridgeHandler.install();
     }
 
-    static OpenTelemetry initOpenTelemetry() {
+    // static OpenTelemetry initOpenTelemetry() {
 
-        // Set up the resource with service.name
-        Resource resource = Resource.create(Attributes.of(AttributeKey.stringKey("service.name"),
-                "tomcat-service"));
+    //     // Set up the resource with service.name
+    //     Resource resource = Resource.create(Attributes.of(AttributeKey.stringKey("service.name"),
+    //             "tomcat-service"));
 
-        // Metrics
-        OtlpGrpcMetricExporter otlpGrpcMetricExporter = OtlpGrpcMetricExporter.builder()
-                .setEndpoint("http://otel-collector:4317")
-                .build();
+    //     // Metrics
+    //     OtlpGrpcMetricExporter otlpGrpcMetricExporter = OtlpGrpcMetricExporter.builder()
+    //             .setEndpoint("http://otel-collector:4317")
+    //             .build();
 
-        PeriodicMetricReader periodicMetricReader = PeriodicMetricReader.builder(otlpGrpcMetricExporter)
-                .setInterval(java.time.Duration.ofSeconds(20))
-                .build();
+    //     PeriodicMetricReader periodicMetricReader = PeriodicMetricReader.builder(otlpGrpcMetricExporter)
+    //             .setInterval(java.time.Duration.ofSeconds(20))
+    //             .build();
 
-        SdkMeterProvider sdkMeterProvider = SdkMeterProvider.builder()
-                .setResource(resource)
-                .registerMetricReader(periodicMetricReader)
-                .build();
+    //     SdkMeterProvider sdkMeterProvider = SdkMeterProvider.builder()
+    //             .setResource(resource)
+    //             .registerMetricReader(periodicMetricReader)
+    //             .build();
 
-        // Traces
-        OtlpGrpcSpanExporter otlpGrpcSpanExporter = OtlpGrpcSpanExporter.builder()
-                .setEndpoint("http://otel-collector:4317")
-                .build();
+    //     // Traces
+    //     OtlpGrpcSpanExporter otlpGrpcSpanExporter = OtlpGrpcSpanExporter.builder()
+    //             .setEndpoint("http://otel-collector:4317")
+    //             .build();
 
-        SimpleSpanProcessor simpleSpanProcessor = SimpleSpanProcessor.builder(otlpGrpcSpanExporter).build();
+    //     SimpleSpanProcessor simpleSpanProcessor = SimpleSpanProcessor.builder(otlpGrpcSpanExporter).build();
 
-        SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
-                .setResource(resource)
-                .addSpanProcessor(simpleSpanProcessor)
-                .build();
+    //     SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
+    //             .setResource(resource)
+    //             .addSpanProcessor(simpleSpanProcessor)
+    //             .build();
 
-        // Logs
-        OtlpGrpcLogRecordExporter otlpGrpcLogRecordExporter = OtlpGrpcLogRecordExporter.builder()
-                .setEndpoint("http://otel-collector:4317")
-                .build();
+    //     // Logs
+    //     OtlpGrpcLogRecordExporter otlpGrpcLogRecordExporter = OtlpGrpcLogRecordExporter.builder()
+    //             .setEndpoint("http://otel-collector:4317")
+    //             .build();
 
-        BatchLogRecordProcessor batchLogRecordProcessor = BatchLogRecordProcessor.builder(otlpGrpcLogRecordExporter)
-                .build();
+    //     BatchLogRecordProcessor batchLogRecordProcessor = BatchLogRecordProcessor.builder(otlpGrpcLogRecordExporter)
+    //             .build();
 
-        SdkLoggerProvider loggerProvider = SdkLoggerProvider.builder()
-                .setResource(resource)
-                .addLogRecordProcessor(batchLogRecordProcessor)
-                .build();
+    //     SdkLoggerProvider loggerProvider = SdkLoggerProvider.builder()
+    //             .setResource(resource)
+    //             .addLogRecordProcessor(batchLogRecordProcessor)
+    //             .build();
 
-        OpenTelemetrySdk sdk = OpenTelemetrySdk.builder()
-                .setMeterProvider(sdkMeterProvider)
-                .setTracerProvider(tracerProvider)
-                .setLoggerProvider(loggerProvider)
-                .build();
+    //     OpenTelemetrySdk sdk = OpenTelemetrySdk.builder()
+    //             .setMeterProvider(sdkMeterProvider)
+    //             .setTracerProvider(tracerProvider)
+    //             .setLoggerProvider(loggerProvider)
+    //             .build();
 
-        // Cleanup
-        Runtime.getRuntime().addShutdownHook(new Thread(sdk::close));
+    //     // Cleanup
+    //     Runtime.getRuntime().addShutdownHook(new Thread(sdk::close));
 
-        return sdk;
+    //     return sdk;
 
-    }
+    // }
 
-    Context parentContext;
+    // Context parentContext;
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -147,16 +147,16 @@ public class MyServlet extends HttpServlet {
         PrintWriter out = response.getWriter();
         response.setContentType("text/html");
 
-        // Create a new ParentSpan
-        Span parentSpan = tracer.spanBuilder("GET").setNoParent().startSpan();
-        parentSpan.makeCurrent();
+        // // Create a new ParentSpan
+        // Span parentSpan = tracer.spanBuilder("GET").setNoParent().startSpan();
+        // parentSpan.makeCurrent();
 
         // Sleep for 2 seconds
         // Span to capture sleep
-        parentContext = Context.current().with(parentSpan);
+        // parentContext = Context.current().with(parentSpan);
         Span sleepSpan = tracer.spanBuilder("SleepForTwoSeconds")
                 .setSpanKind(SpanKind.INTERNAL)
-                .setParent(parentContext)
+                // .setParent(parentContext)
                 .startSpan();
         try {
             Thread.sleep(2000);
@@ -173,7 +173,7 @@ public class MyServlet extends HttpServlet {
         // Context parentContext = Context.current().with(sleepSpan);
         Span dbSpan = tracer.spanBuilder("DatabaseConnection")
                 .setSpanKind(SpanKind.INTERNAL)
-                .setParent(parentContext)
+                // .setParent(parentContext)
                 .startSpan();
 
         // JDBC connection parameters
@@ -230,7 +230,7 @@ public class MyServlet extends HttpServlet {
         } finally {
             dbSpan.end();
         }
-        parentSpan.end();
+        // parentSpan.end();
 
         // Make a request to the Python microservice
         String averageAge = getAverageAge(dataList);
@@ -241,9 +241,11 @@ public class MyServlet extends HttpServlet {
 
     private String getAverageAge(List<JSONObject> dataList) throws IOException {
 
-        Span computeSpan = tracer.spanBuilder("Compute Request").setSpanKind(SpanKind.INTERNAL).setParent(parentContext)
+        Span computeSpan = tracer.spanBuilder("Compute Request")
+                .setSpanKind(SpanKind.INTERNAL)
+                // .setParent(parentContext)
                 .startSpan();
-        Context context = Context.current().with(computeSpan);
+        // Context context = Context.current().with(computeSpan);
 
         try (Scope scope = computeSpan.makeCurrent(); CloseableHttpClient httpClient = HttpClients.createDefault()) {
             HttpPost httpPost = new HttpPost("http://python-service:5000/compute_average_age");
@@ -262,8 +264,8 @@ public class MyServlet extends HttpServlet {
 
             // Inject the context into the HTTP request headers using
             // W3CTraceContextPropagator
-            W3CTraceContextPropagator propagator = W3CTraceContextPropagator.getInstance();
-            propagator.inject(context, httpPost, HttpPost::setHeader);
+            // W3CTraceContextPropagator propagator = W3CTraceContextPropagator.getInstance();
+            // propagator.inject(context, httpPost, HttpPost::setHeader);
 
             try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
                 String responseString = EntityUtils.toString(response.getEntity());
