@@ -39,8 +39,15 @@ import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.metrics.LongCounter;
 import io.opentelemetry.api.metrics.Meter;
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanContext;
+import io.opentelemetry.api.trace.SpanId;
 import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.TraceFlags;
+import io.opentelemetry.api.trace.TraceId;
+import io.opentelemetry.api.trace.TraceState;
 import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.Scope;
 import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporter;
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
 
@@ -108,6 +115,7 @@ public class MyServlet extends HttpServlet {
 
     }
 
+    Context parentContext;
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
@@ -116,11 +124,16 @@ public class MyServlet extends HttpServlet {
         PrintWriter out = response.getWriter();
         response.setContentType("text/html");
 
+        // Create a new ParentSpan      
+        Span parentSpan = tracer.spanBuilder("GET").setNoParent().startSpan();
+        parentSpan.makeCurrent();
+
         // Sleep for 2 seconds
         // Span to capture sleep
-
+        parentContext = Context.current().with(parentSpan);
         Span sleepSpan = tracer.spanBuilder("SleepForTwoSeconds")
                 .setSpanKind(SpanKind.INTERNAL)
+                .setParent(parentContext)
                 .startSpan();
         try {
             Thread.sleep(2000);
@@ -135,8 +148,10 @@ public class MyServlet extends HttpServlet {
         requestCounter.add(1);
 
         // Start Database Span
+        // Context parentContext = Context.current().with(sleepSpan);
         Span dbSpan = tracer.spanBuilder("DatabaseConnection")
             .setSpanKind(SpanKind.INTERNAL)
+            .setParent(parentContext)
             .startSpan();
 
         // JDBC connection parameters
@@ -192,6 +207,7 @@ public class MyServlet extends HttpServlet {
         } finally{
             dbSpan.end();
         }
+        parentSpan.end();
 
         // Make a request to the Python microservice
         String averageAge = getAverageAge(dataList);
@@ -201,7 +217,10 @@ public class MyServlet extends HttpServlet {
     }
 
     private String getAverageAge(List<JSONObject> dataList) throws IOException {
-        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+
+        Span computeSpan = tracer.spanBuilder("Compute Request").setSpanKind(SpanKind.INTERNAL).setParent(parentContext).startSpan();        
+
+        try (Scope scope = computeSpan.makeCurrent(); CloseableHttpClient httpClient = HttpClients.createDefault()) {
             HttpPost httpPost = new HttpPost("http://python-service:5000/compute_average_age");
             httpPost.setHeader("Content-Type", "application/json");
 
@@ -216,6 +235,8 @@ public class MyServlet extends HttpServlet {
                 JSONObject responseJson = new JSONObject(responseString);
                 return responseJson.get("average_age").toString();
             }
-        }
+        }finally{
+            computeSpan.end();
+        }        
     }
 }
