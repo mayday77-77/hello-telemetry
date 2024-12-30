@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 
-# OpenTelemetry SDK
+# OpenTelemetry 
 from opentelemetry.sdk.metrics import MeterProvider, Meter
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry import metrics,trace
@@ -59,9 +59,9 @@ def compute_average_age():
             return jsonify({'error': 'No age data available'}), 400
         
         # Compute the average age
-        average_age = round(sum(ages) / len(ages), 1)
+        average_age = round(sum(ages) / len(ages), 1)        
 
         return jsonify({'average_age': average_age})
-
+    
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
