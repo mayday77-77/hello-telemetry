@@ -31,6 +31,8 @@ import org.apache.http.util.EntityUtils;
 import io.opentelemetry.api.GlobalOpenTelemetry;
 // OpenTelemetry API
 import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.baggage.Baggage;
+import io.opentelemetry.api.baggage.propagation.W3CBaggagePropagator;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.metrics.LongCounter;
@@ -69,7 +71,6 @@ public class MyServlet extends HttpServlet {
         SLF4JBridgeHandler.install();
     }
 
-    
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
@@ -82,7 +83,7 @@ public class MyServlet extends HttpServlet {
         // Span to capture sleep
         // parentContext = Context.current().with(parentSpan);
         Span sleepSpan = tracer.spanBuilder("SleepForTwoSeconds")
-                .setSpanKind(SpanKind.INTERNAL)                
+                .setSpanKind(SpanKind.INTERNAL)
                 .startSpan();
         try {
             Thread.sleep(2000);
@@ -98,7 +99,7 @@ public class MyServlet extends HttpServlet {
         // Start Database Span
         // Context parentContext = Context.current().with(sleepSpan);
         Span dbSpan = tracer.spanBuilder("DatabaseConnection")
-                .setSpanKind(SpanKind.INTERNAL)                
+                .setSpanKind(SpanKind.INTERNAL)
                 .startSpan();
 
         // JDBC connection parameters
@@ -154,7 +155,7 @@ public class MyServlet extends HttpServlet {
             out.println("<h2>Error: " + e.getMessage() + "</h2>");
         } finally {
             dbSpan.end();
-        }       
+        }
 
         // Make a request to the Python microservice
         String averageAge = getAverageAge(dataList);
@@ -166,8 +167,16 @@ public class MyServlet extends HttpServlet {
     private String getAverageAge(List<JSONObject> dataList) throws IOException {
 
         Span computeSpan = tracer.spanBuilder("Compute Request")
-                .setSpanKind(SpanKind.INTERNAL)                
-                .startSpan();        
+                .setSpanKind(SpanKind.INTERNAL)
+                .startSpan();
+
+        // Create Baggage
+        Baggage baggage = Baggage.builder()
+                .put("user.id", "12345")
+                .put("user.name", "john")
+                .build();
+
+        Context contextWithBaggage = Context.current().with(baggage);
 
         try (Scope scope = computeSpan.makeCurrent(); CloseableHttpClient httpClient = HttpClients.createDefault()) {
             HttpPost httpPost = new HttpPost("http://python-service:5000/compute_average_age");
@@ -179,15 +188,13 @@ public class MyServlet extends HttpServlet {
             StringEntity entity = new StringEntity(requestData.toString());
             httpPost.setEntity(entity);
 
-            // Inject the context into the HTTP request headers
-            // TextMapPropagator propagator =
-            // GlobalOpenTelemetry.getPropagators().getTextMapPropagator();
-            // propagator.inject(context, httpPost, HttpPost::setHeader);
-
             // Inject the context into the HTTP request headers using
             // W3CTraceContextPropagator
-            // W3CTraceContextPropagator propagator = W3CTraceContextPropagator.getInstance();
-            // propagator.inject(context, httpPost, HttpPost::setHeader);
+            // W3CTraceContextPropagator propagator =
+            // W3CTraceContextPropagator.getInstance();
+            // propagator.inject(contextWithBaggage, httpPost, HttpPost::setHeader);
+
+            W3CBaggagePropagator.getInstance().inject(contextWithBaggage, httpPost, HttpPost::setHeader);
 
             try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
                 String responseString = EntityUtils.toString(response.getEntity());

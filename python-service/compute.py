@@ -2,10 +2,12 @@ import logging
 from flask import Flask, request, jsonify
 
 # OpenTelemetry 
-from opentelemetry import metrics,trace
+from opentelemetry import metrics,trace,baggage
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.semconv.resource import ResourceAttributes
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+from opentelemetry.baggage.propagation import W3CBaggagePropagator
+
 
 # Create a Resource with the service.name attribute
 resource = Resource.create({ResourceAttributes.SERVICE_NAME: "python-service"})
@@ -31,11 +33,19 @@ def compute_average_age():
     
     # Extract context
     # ctx = TraceContextTextMapPropagator().extract(request.headers)    
-
+    baggage_ctx = W3CBaggagePropagator().extract(request.headers)
+    
     # Start a new span
     with tracer.start_as_current_span("ComputeSpan"):
         logger.info("Average compute in progress")        
-
+        
+        current_span = trace.get_current_span()     
+        
+        baggage_items = baggage.get_all(context=baggage_ctx)
+        
+        for key, value in baggage_items.items():
+            current_span.set_attribute(f"baggage.{key}",value)       
+        
         # Process the request data
         data = request.json['data']
         if not data:
