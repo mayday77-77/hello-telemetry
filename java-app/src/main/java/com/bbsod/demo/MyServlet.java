@@ -25,10 +25,64 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 
+// OpenTelemetry SDK
+import io.opentelemetry.sdk.OpenTelemetrySdk;
+import io.opentelemetry.sdk.metrics.SdkMeterProvider;
+import io.opentelemetry.sdk.metrics.export.PeriodicMetricReader;
+import io.opentelemetry.sdk.resources.Resource;
+// OpenTelemetry API
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.metrics.LongCounter;
+import io.opentelemetry.api.metrics.Meter;
+import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporter;
+
 public class MyServlet extends HttpServlet {
+
+    // Define Class Fields
+    private static final String INSTRUMENTATION_NAME = MyServlet.class.getName();
+    private final Meter meter;
+    private final LongCounter requestCounter;
 
     // Constructor
     public MyServlet() {
+        OpenTelemetry openTelemetry = initOpenTelemetry();
+        this.meter = openTelemetry.getMeter(INSTRUMENTATION_NAME);
+        this.requestCounter = meter.counterBuilder("app.db.db_requests")
+                .setDescription("Count DB requests")
+                .build();
+    }
+
+    static OpenTelemetry initOpenTelemetry() {
+
+        // Set up the resource with service.name
+        Resource resource = Resource.create(Attributes.of(AttributeKey.stringKey("service.name"),
+                "tomcat-service"));
+
+        // Metrics
+        OtlpGrpcMetricExporter otlpGrpcMetricExporter = OtlpGrpcMetricExporter.builder()
+                .setEndpoint("http://otel-collector:4317")
+                .build();
+
+        PeriodicMetricReader periodicMetricReader = PeriodicMetricReader.builder(otlpGrpcMetricExporter)
+                .setInterval(java.time.Duration.ofSeconds(20))
+                .build();
+
+        SdkMeterProvider sdkMeterProvider = SdkMeterProvider.builder()
+                .setResource(resource)
+                .registerMetricReader(periodicMetricReader)
+                .build();
+
+        OpenTelemetrySdk sdk = OpenTelemetrySdk.builder()
+                .setMeterProvider(sdkMeterProvider)
+                .build();
+
+        // Cleanup
+        Runtime.getRuntime().addShutdownHook(new Thread(sdk::close));
+
+        return sdk;
+
     }
 
     @Override
@@ -47,6 +101,7 @@ public class MyServlet extends HttpServlet {
         }
 
         // Establish database connection and get data
+        requestCounter.add(1);
 
         // JDBC connection parameters
         String jdbcUrl = "jdbc:mysql://mysql_container:3306/mydatabase";
