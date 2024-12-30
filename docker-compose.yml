@@ -23,10 +23,10 @@ services:
       - "9010:9010"
       - "1099:1099"    
     environment:
-      - JAVA_OPTS=-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=1099 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=localhost
+      - JAVA_OPTS=-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=1099 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=localhost      
       - JAVA_TOOL_OPTIONS=-javaagent:/opt/opentelemetry-javaagent.jar
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
-      - OTEL_RESOURCE_ATTRIBUTES=service.name=tomcat-service
+      - OTEL_SERVICE_NAME=tomcat-service
     depends_on:
       - mysql
       - python-service
@@ -70,6 +70,7 @@ services:
       - "9411:9411"
     networks:
       - my_network
+
 
 volumes:
   mysql_data:

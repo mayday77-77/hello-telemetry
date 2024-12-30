@@ -5,7 +5,7 @@
     <title>My Web App</title>
 </head>
 <body>
-    <h1>Welcome to My Web Application</h1>
+    <h1>Welcome to hello-telemetry Application</h1>
     <a href="results">View Database Results</a>
 </body>
 </html>

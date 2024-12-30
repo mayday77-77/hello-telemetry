@@ -15,10 +15,11 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Logger;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
-
+import org.slf4j.bridge.SLF4JBridgeHandler;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
@@ -26,136 +27,48 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 
-//Global OpenTelemetry
-import io.opentelemetry.api.GlobalOpenTelemetry;
+// OpenTelemetry SDK
 
-// OpenTelemetry API Imports
+import io.opentelemetry.api.GlobalOpenTelemetry;
+// OpenTelemetry API
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.baggage.Baggage;
+import io.opentelemetry.api.baggage.propagation.W3CBaggagePropagator;
 import io.opentelemetry.api.metrics.LongCounter;
 import io.opentelemetry.api.metrics.Meter;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.Tracer;
-
-// // Manual only instrumentation
-// OpenTelemetry API Imports
-// import io.opentelemetry.api.OpenTelemetry;
-// import io.opentelemetry.api.common.Attributes; 
-// import io.opentelemetry.api.common.AttributeKey;
-
-// // OpenTelemetry SDK Imports
-// import io.opentelemetry.sdk.OpenTelemetrySdk;
-// import io.opentelemetry.sdk.resources.Resource;
-// import io.opentelemetry.sdk.metrics.SdkMeterProvider;
-// import io.opentelemetry.sdk.trace.SdkTracerProvider;
-// import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
-// import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
-
-// // OpenTelemetry Exporter & Propgator Imports
-// import io.opentelemetry.sdk.metrics.export.PeriodicMetricReader;
-// import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporter;
-// import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
-// import io.opentelemetry.context.propagation.ContextPropagators;
-// import io.opentelemetry.exporter.logging.LoggingSpanExporter;
-
-// Baggage
-import io.opentelemetry.api.baggage.Baggage;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
+import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
 
 @WebServlet(urlPatterns = "/MyWebApp", loadOnStartup = -1)
 public class MyServlet extends HttpServlet {
 
     // Define Class Fields
     private static final String INSTRUMENTATION_NAME = MyServlet.class.getName();
-
-    // ** Auto + Manual instrumentation */
-    /*********************/
-    // Global OpenTelemetry
-    private final static Tracer tracer = GlobalOpenTelemetry.getTracer(INSTRUMENTATION_NAME);
-    private final static Meter meter = GlobalOpenTelemetry.getMeter(INSTRUMENTATION_NAME);
-    private final LongCounter requestCounter = meter.counterBuilder("app.db.db_requests")
-            .setDescription("Count DB requests")
-            .build();
-
-    /** Manual Only Instrumentations */
-    /*********************/
-
-    // private final Meter meter;
-    // private final LongCounter requestCounter;
-    // private final Tracer tracer;
+    private final Meter meter;
+    private final LongCounter requestCounter;
+    private final Tracer tracer;
+    private static final java.util.logging.Logger julLogger = Logger.getLogger("jul-logger");
 
     // Constructor
-    public MyServlet() {                
-                
-        // Initializes OpenTelemetry and calls parameterized constructor with this new instance of OpenTelemetry
-        // // this(initOpenTelemetry());
-    }    
+    public MyServlet() {
+        OpenTelemetry openTelemetry = GlobalOpenTelemetry.get();
+        this.meter = openTelemetry.getMeter(INSTRUMENTATION_NAME);
+        this.requestCounter = meter.counterBuilder("app.db.db_requests")
+                .setDescription("Count DB requests")
+                .build();
+        this.tracer = openTelemetry.getTracer(INSTRUMENTATION_NAME);
 
-    // Parameterized Constructor
-    // Accepts OpenTelemetry instance and initializes the meter, request counter and
-    // tracer.
-    // public MyServlet(OpenTelemetry openTelemetry) {
-    // this.meter = openTelemetry.getMeter(INSTRUMENTATION_NAME);
-    // this.requestCounter = meter.counterBuilder("app.db.db_requests")
-    // .setDescription("Counts DB requests")
-    // .build();
-    // this.tracer = openTelemetry.getTracer(INSTRUMENTATION_NAME);
-    // }
+        // Install OpenTelemetry in logback appender
+        OpenTelemetryAppender.install(openTelemetry);
 
-    // // Initializes OpenTelemetry
-    // static OpenTelemetry initOpenTelemetry() {
-
-    // // Set up the resource with service.name
-    // Resource resource =
-    // Resource.create(Attributes.of(AttributeKey.stringKey("service.name"),
-    // "tomcat-service"));
-
-    // // Metrics
-    // OtlpGrpcMetricExporter otlpGrpcMetricExporter =
-    // OtlpGrpcMetricExporter.builder()
-    // .setEndpoint("http://otel-collector:4317").build();
-
-    // PeriodicMetricReader periodicMetricReader =
-    // PeriodicMetricReader.builder(otlpGrpcMetricExporter)
-    // .setInterval(java.time.Duration.ofSeconds(60))
-    // .build();
-
-    // SdkMeterProvider sdkMeterProvider = SdkMeterProvider.builder()
-    // .registerMetricReader(periodicMetricReader)
-    // .build();
-
-    // // Traces
-    // OtlpGrpcSpanExporter otlpGrpcSpanExporter = OtlpGrpcSpanExporter.builder()
-    // .setEndpoint("http://otel-collector:4317").build();
-
-    // SdkTracerProvider sdkTracerProvider = SdkTracerProvider.builder()
-    // .setResource(resource)
-    // .addSpanProcessor(SimpleSpanProcessor.create(otlpGrpcSpanExporter))
-    // .build();
-
-    // // Traces as Logs
-    // SdkTracerProvider sdkTracerProviderLogs = SdkTracerProvider.builder()
-    // .addSpanProcessor(SimpleSpanProcessor.create(LoggingSpanExporter.create()))
-    // .build();
-
-    // // SDK
-    // OpenTelemetrySdk sdk = OpenTelemetrySdk.builder()
-    // .setMeterProvider(sdkMeterProvider)
-    // .setTracerProvider(sdkTracerProvider)
-    // .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
-    // // .setTracerProvider(sdkTracerProviderLogs) // NOTE: This line has to be
-    // // commented out when using live. The second `.setTracerProvder(..)` will
-    // // override previous one
-    // .build();
-
-    // // Cleanup
-    // Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-    // sdkMeterProvider.close();
-    // sdkTracerProvider.close();
-    // }));
-
-    // return sdk;
-    // }
+        // Install SLF4JBridgeHandler to route JUL logs to SLF4J
+        SLF4JBridgeHandler.removeHandlersForRootLogger();
+        SLF4JBridgeHandler.install();
+    }
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -165,89 +78,84 @@ public class MyServlet extends HttpServlet {
         PrintWriter out = response.getWriter();
         response.setContentType("text/html");
 
-        // Start a new span for the sleep
-        Span delaySpan = tracer.spanBuilder("SleepForTwoSeconds")
+        // Sleep for 2 seconds
+        // Span to capture sleep
+        // parentContext = Context.current().with(parentSpan);
+        Span sleepSpan = tracer.spanBuilder("SleepForTwoSeconds")
+                .setSpanKind(SpanKind.INTERNAL)
+                .startSpan();
+        try {
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            sleepSpan.end();
+        }
+
+        // Establish database connection and get data
+        requestCounter.add(1);
+
+        // Start Database Span
+        // Context parentContext = Context.current().with(sleepSpan);
+        Span dbSpan = tracer.spanBuilder("DatabaseConnection")
                 .setSpanKind(SpanKind.INTERNAL)
                 .startSpan();
 
-        try (Scope scope = delaySpan.makeCurrent()) {
-        // try{
-            // Sleep for 2 seconds
-            Thread.sleep(2000);
-            delaySpan.end(); // Ensure the span ends after the sleep
-        } catch (InterruptedException e) {
-            delaySpan.recordException(e);
-            e.printStackTrace();
-        }
+        // JDBC connection parameters
+        String jdbcUrl = "jdbc:mysql://mysql_container:3306/mydatabase";
+        String jdbcUser = "myuser";
+        String jdbcPassword = "mypassword";
 
-        // Increment metric counter
-        requestCounter.add(1);
+        try {
+            julLogger.info("DB Connection initiated");
+            // Load MySQL JDBC Driver
+            Class.forName("com.mysql.cj.jdbc.Driver");
 
-        // Start a span
-        Context parentContext = Context.current().with(delaySpan);
-        Span dbSpan = tracer.spanBuilder("Database transaction").setParent(parentContext).startSpan();
+            // Establish connection
+            Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUser,
+                    jdbcPassword);
 
-        // Establish database connection and get data
-        try (Scope scope = dbSpan.makeCurrent()) {
-            // JDBC connection parameters
-            // String jdbcUrl = "jdbc:mysql://localhost:3306/mydatabase";
-            String jdbcUrl = "jdbc:mysql://mysql_container:3306/mydatabase";
-            String jdbcUser = "myuser";
-            String jdbcPassword = "mypassword";
+            // Create a statement
+            Statement statement = connection.createStatement();
 
-            try {
-                // Load MySQL JDBC Driver
-                Class.forName("com.mysql.cj.jdbc.Driver");
+            // Execute a query
+            String query = "SELECT * FROM mytable";
+            ResultSet resultSet = statement.executeQuery(query);
 
-                // Establish connection
-                Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUser,
-                        jdbcPassword);
+            // Build web page
+            out.println("<html><body>");
+            out.println("<h1>Database Results</h1>");
+            out.println("<table border='1'>");
+            out.println("<tr><th>ID</th><th>Name</th><th>Age</th></tr>");
 
-                // Create a statement
-                Statement statement = connection.createStatement();
+            while (resultSet.next()) {
+                int id = resultSet.getInt("id");
+                String name = resultSet.getString("name");
+                int age = resultSet.getInt("age");
+                out.println("<tr><td>" + id + "</td><td>" + name + "</td><td>" + age
+                        + "</td></tr>");
 
-                // Execute a query
-                String query = "SELECT * FROM mytable";
-                ResultSet resultSet = statement.executeQuery(query);
+                JSONObject dataObject = new JSONObject();
+                dataObject.put("id", id);
+                dataObject.put("name", name);
+                dataObject.put("age", age);
+                dataList.add(dataObject);
 
-                out.println("<html><body>");
-                out.println("<h1>Database Results</h1>");
-                out.println("<table border='1'>");
-                out.println("<tr><th>ID</th><th>Name</th><th>Age</th></tr>");
-
-                
-                while (resultSet.next()) {
-                    int id = resultSet.getInt("id");
-                    String name = resultSet.getString("name");
-                    int age = resultSet.getInt("age");
-                    out.println("<tr><td>" + id + "</td><td>" + name + "</td><td>" + age
-                            + "</td></tr>");
-
-                    JSONObject dataObject = new JSONObject();
-                    dataObject.put("id", id);
-                    dataObject.put("name", name);
-                    dataObject.put("age", age);
-                    dataList.add(dataObject);
-
-                }
-                out.println("</table>");
-
-            } catch (ClassNotFoundException e) {
-                System.out.println("MySQL JDBC Driver not found.");
-                e.printStackTrace();
-            } catch (SQLException e) {
-                System.out.println("Connection failed.");
-                e.printStackTrace();
-            } catch (Exception e) {
-                e.printStackTrace();
-                out.println("<h2>Error: " + e.getMessage() + "</h2>");
-            } finally {
-                dbSpan.end(); // Close the span once request complete
             }
+            out.println("</table>");
+        } catch (ClassNotFoundException e) {
+            System.out.println("MySQL JDBC Driver not found.");
+            e.printStackTrace();
+        } catch (SQLException e) {
+            System.out.println("Connection failed.");
+            e.printStackTrace();
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            e.printStackTrace();
+            out.println("<h2>Error: " + e.getMessage() + "</h2>");
+        } finally {
+            dbSpan.end();
         }
-        
+
         // Make a request to the Python microservice
         String averageAge = getAverageAge(dataList);
         out.println("<h2>Average Age: " + averageAge + "</h2>");
@@ -256,16 +164,20 @@ public class MyServlet extends HttpServlet {
     }
 
     private String getAverageAge(List<JSONObject> dataList) throws IOException {
-        // Create baggage with a key-value pair
+
+        Span computeSpan = tracer.spanBuilder("Compute Request")
+                .setSpanKind(SpanKind.INTERNAL)
+                .startSpan();
+
+        // Create Baggage
         Baggage baggage = Baggage.builder()
                 .put("user.id", "12345")
                 .put("user.name", "john")
                 .build();
 
-        // Attach the baggage to the current context
         Context contextWithBaggage = Context.current().with(baggage);
 
-        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+        try (Scope scope = computeSpan.makeCurrent(); CloseableHttpClient httpClient = HttpClients.createDefault()) {
             HttpPost httpPost = new HttpPost("http://python-service:5000/compute_average_age");
             httpPost.setHeader("Content-Type", "application/json");
 
@@ -275,15 +187,21 @@ public class MyServlet extends HttpServlet {
             StringEntity entity = new StringEntity(requestData.toString());
             httpPost.setEntity(entity);
 
-            // Inject the OpenTelemetry context (including baggage) into the HTTP headers
-            GlobalOpenTelemetry.getPropagators().getTextMapPropagator()
-                    .inject(contextWithBaggage, httpPost, (carrier, key, value) -> carrier.setHeader(key, value));
+            // Inject the context into the HTTP request headers using
+            // W3CTraceContextPropagator
+            // W3CTraceContextPropagator propagator =
+            // W3CTraceContextPropagator.getInstance();
+            // propagator.inject(contextWithBaggage, httpPost, HttpPost::setHeader);
+
+            W3CBaggagePropagator.getInstance().inject(contextWithBaggage, httpPost, HttpPost::setHeader);
 
             try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
                 String responseString = EntityUtils.toString(response.getEntity());
                 JSONObject responseJson = new JSONObject(responseString);
                 return responseJson.get("average_age").toString();
             }
+        } finally {
+            computeSpan.end();
         }
     }
 }
