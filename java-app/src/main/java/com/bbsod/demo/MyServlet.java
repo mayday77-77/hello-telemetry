@@ -43,17 +43,11 @@ import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.metrics.LongCounter;
 import io.opentelemetry.api.metrics.Meter;
 import io.opentelemetry.api.trace.Span;
-import io.opentelemetry.api.trace.SpanContext;
-import io.opentelemetry.api.trace.SpanId;
 import io.opentelemetry.api.trace.SpanKind;
-import io.opentelemetry.api.trace.TraceFlags;
-import io.opentelemetry.api.trace.TraceId;
-import io.opentelemetry.api.trace.TraceState;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
-import io.opentelemetry.context.propagation.TextMapPropagator;
 import io.opentelemetry.exporter.otlp.logs.OtlpGrpcLogRecordExporter;
 import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporter;
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
@@ -122,8 +116,9 @@ public class MyServlet extends HttpServlet {
                 .setEndpoint("http://otel-collector:4317")
                 .build();
 
-        BatchLogRecordProcessor batchLogRecordProcessor = BatchLogRecordProcessor.builder(otlpGrpcLogRecordExporter).build();
-        
+        BatchLogRecordProcessor batchLogRecordProcessor = BatchLogRecordProcessor.builder(otlpGrpcLogRecordExporter)
+                .build();
+
         SdkLoggerProvider loggerProvider = SdkLoggerProvider.builder()
                 .setResource(resource)
                 .addLogRecordProcessor(batchLogRecordProcessor)
@@ -134,8 +129,6 @@ public class MyServlet extends HttpServlet {
                 .setTracerProvider(tracerProvider)
                 .setLoggerProvider(loggerProvider)
                 .build();
-
-            
 
         // Cleanup
         Runtime.getRuntime().addShutdownHook(new Thread(sdk::close));
@@ -263,11 +256,13 @@ public class MyServlet extends HttpServlet {
             httpPost.setEntity(entity);
 
             // Inject the context into the HTTP request headers
-            // TextMapPropagator propagator = GlobalOpenTelemetry.getPropagators().getTextMapPropagator();
+            // TextMapPropagator propagator =
+            // GlobalOpenTelemetry.getPropagators().getTextMapPropagator();
             // propagator.inject(context, httpPost, HttpPost::setHeader);
 
-            // Inject the context into the HTTP request headers using W3CTraceContextPropagator 
-            W3CTraceContextPropagator propagator = W3CTraceContextPropagator.getInstance(); 
+            // Inject the context into the HTTP request headers using
+            // W3CTraceContextPropagator
+            W3CTraceContextPropagator propagator = W3CTraceContextPropagator.getInstance();
             propagator.inject(context, httpPost, HttpPost::setHeader);
 
             try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
