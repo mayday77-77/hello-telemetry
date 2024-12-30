@@ -28,23 +28,33 @@ app = Flask(__name__)
 
 @app.route('/compute_average_age', methods=['POST'])
 def compute_average_age():        
-    # Increment compute counter
-    compute_request_count.add(1)
     
     # Extract context
     # ctx = TraceContextTextMapPropagator().extract(request.headers)    
     baggage_ctx = W3CBaggagePropagator().extract(request.headers)
+    baggage_items = baggage.get_all(context=baggage_ctx)
+    
+    # Convert Baggage items to a dictionary of attributes
+    attributes = {key: value for key, value in baggage_items.items()}
+
+    
+    # Increment compute counter
+    compute_request_count.add(1,attributes)
+        
+    
     
     # Start a new span
     with tracer.start_as_current_span("ComputeSpan"):
-        logger.info("Average compute in progress")        
+        
+        for key, value in attributes.items():
+            logger_with_attributes = logging.LoggerAdapter(logger, {key: value})
+        logger_with_attributes.info("Average compute in progress")
         
         current_span = trace.get_current_span()     
         
         baggage_items = baggage.get_all(context=baggage_ctx)
-        
-        for key, value in baggage_items.items():
-            current_span.set_attribute(f"baggage.{key}",value)       
+                
+        current_span.set_attributes(attributes)
         
         # Process the request data
         data = request.json['data']
