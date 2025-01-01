@@ -10,9 +10,6 @@ COPY requirements.txt ./
 # Install the required packages
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install OpenTelemetry packages 
-RUN pip install opentelemetry-distro opentelemetry-exporter-otlp
-
 # Run opentelemetry-bootstrap to install instrumentation packages 
 RUN opentelemetry-bootstrap -a install
 
