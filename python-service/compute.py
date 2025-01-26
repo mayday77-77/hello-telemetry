@@ -15,7 +15,7 @@ resource = Resource.create({ResourceAttributes.SERVICE_NAME: "python-service"})
 # Initialize OpenTelemetry SDK
 
 # Metrics
-exporter = OTLPMetricExporter(endpoint="http://otel-collector:4317", insecure=True)
+exporter = OTLPMetricExporter(endpoint="http://ht-otel-collector:4317", insecure=True)
 reader = PeriodicExportingMetricReader(exporter,export_interval_millis=10000)
 meterProvider = MeterProvider(resource=resource,metric_readers=[reader])
 metrics.set_meter_provider(meterProvider)

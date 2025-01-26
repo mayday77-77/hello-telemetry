@@ -62,7 +62,7 @@ public class MyServlet extends HttpServlet {
 
         // Metrics
         OtlpGrpcMetricExporter otlpGrpcMetricExporter = OtlpGrpcMetricExporter.builder()
-                .setEndpoint("http://otel-collector:4317")
+                .setEndpoint("http://ht-otel-collector:4317")
                 .build();
 
         PeriodicMetricReader periodicMetricReader = PeriodicMetricReader.builder(otlpGrpcMetricExporter)
@@ -104,7 +104,7 @@ public class MyServlet extends HttpServlet {
         requestCounter.add(1);
 
         // JDBC connection parameters
-        String jdbcUrl = "jdbc:mysql://mysql_container:3306/mydatabase";
+        String jdbcUrl = "jdbc:mysql://ht-mysql:3306/mydatabase";
         String jdbcUser = "myuser";
         String jdbcPassword = "mypassword";
 
@@ -164,7 +164,7 @@ public class MyServlet extends HttpServlet {
 
     private String getAverageAge(List<JSONObject> dataList) throws IOException {
         try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
-            HttpPost httpPost = new HttpPost("http://python-service:5000/compute_average_age");
+            HttpPost httpPost = new HttpPost("http://ht-python-service:5000/compute_average_age");
             httpPost.setHeader("Content-Type", "application/json");
 
             JSONObject requestData = new JSONObject();
