@@ -87,7 +87,7 @@ public class MyServlet extends HttpServlet {
 
         // Metrics
         OtlpGrpcMetricExporter otlpGrpcMetricExporter = OtlpGrpcMetricExporter.builder()
-                .setEndpoint("http://otel-collector:4317")
+                .setEndpoint("http://ht-otel-collector:4317")
                 .build();
 
         PeriodicMetricReader periodicMetricReader = PeriodicMetricReader.builder(otlpGrpcMetricExporter)
@@ -101,7 +101,7 @@ public class MyServlet extends HttpServlet {
 
         // Traces
         OtlpGrpcSpanExporter otlpGrpcSpanExporter = OtlpGrpcSpanExporter.builder()
-                .setEndpoint("http://otel-collector:4317")
+                .setEndpoint("http://ht-otel-collector:4317")
                 .build();
 
         SimpleSpanProcessor simpleSpanProcessor = SimpleSpanProcessor.builder(otlpGrpcSpanExporter).build();
@@ -113,7 +113,7 @@ public class MyServlet extends HttpServlet {
 
         // Logs
         OtlpGrpcLogRecordExporter otlpGrpcLogRecordExporter = OtlpGrpcLogRecordExporter.builder()
-                .setEndpoint("http://otel-collector:4317")
+                .setEndpoint("http://ht-otel-collector:4317")
                 .build();
 
         BatchLogRecordProcessor batchLogRecordProcessor = BatchLogRecordProcessor.builder(otlpGrpcLogRecordExporter)
@@ -177,7 +177,7 @@ public class MyServlet extends HttpServlet {
                 .startSpan();
 
         // JDBC connection parameters
-        String jdbcUrl = "jdbc:mysql://mysql_container:3306/mydatabase";
+        String jdbcUrl = "jdbc:mysql://ht-mysql:3306/mydatabase";
         String jdbcUser = "myuser";
         String jdbcPassword = "mypassword";
 
@@ -246,7 +246,7 @@ public class MyServlet extends HttpServlet {
         Context context = Context.current().with(computeSpan);
 
         try (Scope scope = computeSpan.makeCurrent(); CloseableHttpClient httpClient = HttpClients.createDefault()) {
-            HttpPost httpPost = new HttpPost("http://python-service:5000/compute_average_age");
+            HttpPost httpPost = new HttpPost("http://ht-python-service:5000/compute_average_age");
             httpPost.setHeader("Content-Type", "application/json");
 
             JSONObject requestData = new JSONObject();
