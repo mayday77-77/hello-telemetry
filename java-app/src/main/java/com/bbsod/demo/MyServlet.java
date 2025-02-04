@@ -96,7 +96,7 @@ public class MyServlet extends HttpServlet {
         // Start Database Span
         // Context parentContext = Context.current().with(sleepSpan);
         Span dbSpan = tracer.spanBuilder("DatabaseConnection")
-                .setSpanKind(SpanKind.INTERNAL)
+                .setSpanKind(SpanKind.CLIENT)
                 .startSpan();
 
         // JDBC connection parameters
@@ -164,7 +164,7 @@ public class MyServlet extends HttpServlet {
     private String getAverageAge(List<JSONObject> dataList) throws IOException {
 
         Span computeSpan = tracer.spanBuilder("Compute Request")
-                .setSpanKind(SpanKind.INTERNAL)
+                .setSpanKind(SpanKind.CLIENT)
                 .startSpan();
 
         // Create Baggage
