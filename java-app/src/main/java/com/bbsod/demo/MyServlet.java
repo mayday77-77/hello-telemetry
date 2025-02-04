@@ -146,7 +146,7 @@ public class MyServlet extends HttpServlet {
         // Start Database Span
         // Context parentContext = Context.current().with(sleepSpan);
         Span dbSpan = tracer.spanBuilder("DatabaseConnection")
-                .setSpanKind(SpanKind.INTERNAL)
+                .setSpanKind(SpanKind.CLIENT)
                 .setParent(parentContext)
                 .startSpan();
 
@@ -214,7 +214,7 @@ public class MyServlet extends HttpServlet {
 
     private String getAverageAge(List<JSONObject> dataList) throws IOException {
 
-        Span computeSpan = tracer.spanBuilder("Compute Request").setSpanKind(SpanKind.INTERNAL).setParent(parentContext)
+        Span computeSpan = tracer.spanBuilder("Compute Request").setSpanKind(SpanKind.CLIENT).setParent(parentContext)
                 .startSpan();
         Context context = Context.current().with(computeSpan);
 
