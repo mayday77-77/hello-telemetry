@@ -36,13 +36,10 @@ def compute_average_age():
     
     # Convert Baggage items to a dictionary of attributes
     attributes = {key: value for key, value in baggage_items.items()}
-
     
     # Increment compute counter
-    compute_request_count.add(1,attributes)
+    compute_request_count.add(1,attributes)       
         
-    
-    
     # Start a new span
     with tracer.start_as_current_span("ComputeSpan"):
         
@@ -50,10 +47,7 @@ def compute_average_age():
             logger_with_attributes = logging.LoggerAdapter(logger, {key: value})
         logger_with_attributes.info("Average compute in progress")
         
-        current_span = trace.get_current_span()     
-        
-        baggage_items = baggage.get_all(context=baggage_ctx)
-                
+        current_span = trace.get_current_span()
         current_span.set_attributes(attributes)
         
         # Process the request data
